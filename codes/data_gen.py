@@ -111,9 +111,8 @@ class YoloData(Dataset):
     def __getitem__(self, index):
         n = len(self.train_lines)
         index = index % n
-        img, box_data = self.get_random_data(self.train_lines[index],
-                                             self.image_size[0:2], random=self.is_train)
-        # 归一化后的x,y,w,h,c
+        img, box_data = self.get_random_data(self.train_lines[index], self.image_size[0:2], random=self.is_train)
+        # 获得归一化后的x,y,w,h,c
         box_xy = (box_data[..., 0:2] + box_data[..., 2:4]) / 2
         box_wh = box_data[..., 2:4] - box_data[..., 0:2]
         box_data[..., 0:2] = box_xy / self.image_size[::-1]

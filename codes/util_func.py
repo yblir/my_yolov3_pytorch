@@ -78,14 +78,13 @@ def decode_pred_boxes(feat, anchors, num_classes, input_shape, training=False):
     # 构建13x13网格,x-w,y-h
     x = torch.reshape(torch.arange(0, end=grid_shape[1]), [1, 1, -1, 1])
     y = torch.reshape(torch.arange(0, end=grid_shape[0]), [1, -1, 1, 1])
-
     grid_x = torch.tile(x, [num_anchors, grid_shape[0], 1, 1])
     grid_y = torch.tile(y, [num_anchors, 1, grid_shape[1], 1])
     grid_xy = torch.cat([grid_x, grid_y], dim=-1)  # (3,13,13,2)
 
     # b,75,13,13 => b,3,13,13,25
-    y_pred = feat.view(-1, num_anchors, 5 + num_classes,
-                       grid_shape[0], grid_shape[1]).permute(0, 1, 3, 4, 2).contiguous()
+    y_pred = feat.reshape(-1, num_anchors, 5 + num_classes,
+                          grid_shape[0], grid_shape[1]).permute(0, 1, 3, 4, 2).contiguous()
     # 模型预测的是先验框到真实的的变化量, 因此要获得预测框中心,要加上所在网格位置, 要获得宽高,要乘上原有anchor宽高
     # 预测框xy=o(预测的xy变化量)+grid_xy
     # todo cuda ?
@@ -124,15 +123,18 @@ def encode_true_boxes(true_boxes, anchors, input_shape, num_classes):
     # 构建(13,13),(26,26),(52,52) 尺寸的真实值全0空壳,用于填入真实值
     grid_shape = [input_shape // {0: 32, 1: 16, 2: 8}[l] for l in range(num_layers)]  # h,w
     # b,3,13,13,85
-    y_true = [np.zeros((batch_size, len(anchor_mask[i]),
-                        grid_shape[i][0], grid_shape[i][1], 5 + num_classes)) for i in range(num_layers)]
+    y_true = [
+        np.zeros(
+            (batch_size, len(anchor_mask[i]), grid_shape[i][0], grid_shape[i][1], 5 + num_classes)
+        ) for i in range(num_layers)
+    ]
 
     # 处理anchor宽高,适应box_iou函数 32,14->(0,0,32,14)
     anchor_tensor = torch.from_numpy(anchors)
     anchor_boxes = torch.cat([torch.zeros_like(anchor_tensor), anchor_tensor], dim=-1)
 
     for b in range(batch_size):
-        box_wh = true_boxes[b][..., 2:4] * input_shape[::-1]  # 统一到416尺度, 之后再与416尺度下的anchor计算iou
+        box_wh = true_boxes[b][..., 2:4] * input_shape[::-1]  # hw统一到416尺度, 之后再与416尺度下的anchor计算iou
         # valid_mask = box_wh[:, 0] > 0
         wh = box_wh[box_wh[:, 0] > 0]  # 提取真实框宽高, 去除真实框所有的填充项0,,box_wh shape=(n,2)
         if len(wh) == 0:
@@ -142,23 +144,26 @@ def encode_true_boxes(true_boxes, anchors, input_shape, num_classes):
         wh_boxes = torch.cat([torch.zeros_like(wh), wh], dim=-1)
         # 找出与每个真实框iou交并比最大的anchor框编号,(n,9)
         iou = box_iou(wh_boxes, anchor_boxes)
-        best_anchor = np.argmax(iou, axis=-1)  # (n,)
+        best_anchor_index = np.argmax(iou, axis=-1)  # (n,)
 
-        # i指第几个标注框,n指iou最大的anchor对应的编号
-        for i, n in enumerate(best_anchor):
-            for l in range(num_layers):
-                if n in anchor_mask[l]:
+        # i指这张图上的第几个标注框,idx指与该标注框iou最大的anchor对应的编号
+        for i, idx in enumerate(best_anchor_index):
+            for j in range(num_layers):
+                if idx in anchor_mask[j]:
                     # x指标注框水平方向,y指竖直方向,grid_shape:h,w
-                    x = np.floor(true_boxes[b][i, 0] * grid_shape[l][1]).astype('int32')
-                    y = np.floor(true_boxes[b][i, 1] * grid_shape[l][0]).astype('int32')
-                    k = anchor_mask[l].index(n)  # k指该层中的第几个先验框,如13x13中的第2层
+                    x = np.floor(true_boxes[b][i, 0] * grid_shape[j][1]).astype('int32')
+                    y = np.floor(true_boxes[b][i, 1] * grid_shape[j][0]).astype('int32')
+                    k = anchor_mask[j].index(idx)  # k指该层中的第几个先验框,如13x13中的第2层
                     c = true_boxes[b][i, 4].astype('int32')
-                    y_true[l][b, k, y, x, 0:4] = true_boxes[b][i, 0:4]
-                    y_true[l][b, k, y, x, 4] = 1  # 是否有物体的置信度
-                    y_true[l][b, k, y, x, 5 + c] = 1
+
+                    y_true[j][b, k, y, x, 0:4] = true_boxes[b][i, 0:4]
+                    y_true[j][b, k, y, x, 4] = 1  # 是否有物体的置信度
+                    y_true[j][b, k, y, x, 5 + c] = 1
+
                     break  # 一个标注框只会与一个anchor有最大iou,找到后跳出内层循环,计算下一个标注框
 
     y_true = [torch.from_numpy(item).to(torch.float32) for item in y_true]
+
     return y_true
 
 

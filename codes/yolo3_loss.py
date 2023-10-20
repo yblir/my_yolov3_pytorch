@@ -85,7 +85,7 @@ class YoloLoss(nn.Module):
         for i in range(self.num_layers):
             object_mask = y_true[i][..., 4:5]  # (b,3,13,13,1)
             cur_anchors = self.anchors[self.anchor_mask[i]]  # 如13x13特征层对应的三个anchors,shape=(3,2)
-            # 谁让通道维度在前呢! 只能改变shape了. 如13x13特征层共有三个通道,每个通道对应1个anchor框
+            # 通道维度在前 只能改变shape了. 如13x13特征层共有三个通道,每个通道对应1个anchor框
             anchor_reshape = torch.from_numpy(cur_anchors.reshape(3, 1, 1, 2))
 
             # pred_box不是pred_xy,wh等模型输出的直接堆叠,而是经过公式计算后得到的预测框,直接指示预测位置

@@ -1,8 +1,8 @@
-import time
-import cProfile, pstats
-from pstats import SortKey
-import cv2
-import numpy as np
+# import time
+# import cProfile, pstats
+# from pstats import SortKey
+# import cv2
+# import numpy as np
 from PIL import Image
 
 from codes.yolo3_eval import YOLO
@@ -25,8 +25,4 @@ def run():
 
 
 if __name__ == "__main__":
-    # cProfile.run('run()', filename='res.cprofile')
-    p = pstats.Stats('res.cprofile')
-    p.strip_dirs().sort_stats('cumulative').print_stats(30)
-    # p.sort_stats('cumulative').print_stats(30)
-    # snakeviz res.cprofile
+    run()

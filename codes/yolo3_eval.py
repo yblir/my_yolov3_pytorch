@@ -166,8 +166,8 @@ class YOLO(object):
             else:
                 text_origin = np.array([left, top + 1])
 
-            for i in range(thickness):
-                draw.rectangle([left + i, top + i, right - i, bottom - i], outline=self.color[c])
+            for j in range(thickness):
+                draw.rectangle([left + j, top + j, right - j, bottom - j], outline=self.color[c])
             draw.rectangle([tuple(text_origin), tuple(text_origin + label_size)], fill=self.color[c])
             draw.text(text_origin, str(label, 'UTF-8'), fill=(0, 0, 0), font=font)
             del draw
